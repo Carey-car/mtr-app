@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTR 實時班次 - 北角站</title>
+    <style>
+        body { 
+            background-color: #1a1a1a; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 20px; 
+            margin: 0;
+        }
+        .container { 
+            max-width: 400px; 
+            margin: 0 auto; 
+            background: #2a2a2a; 
+            border-radius: 12px; 
+            padding: 20px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+        }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 3px solid #0071CE; 
+            padding-bottom: 10px; 
+            margin-bottom: 15px; 
+        }
+        .station-name { font-size: 24px; font-weight: bold; }
+        .line-name { 
+            background-color: #0071CE; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            font-size: 14px; 
+            font-weight: bold;
+        }
+        .direction-title { font-size: 16px; margin: 15px 0 10px; color: #888; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .train-item { 
+            display: flex; 
+            justify-content: space-between; 
+            background: #333; 
+            margin-bottom: 10px; 
+            padding: 12px 15px; 
+            border-radius: 8px; 
+            align-items: center; 
+        }
+        .time-left { font-size: 22px; font-weight: bold; color: #4CAF50; }
+        .time-left.soon { color: #f44336; }
+        .plat { font-size: 13px; background: #555; padding: 3px 8px; border-radius: 4px; margin-right: 10px; }
+        .dest-name { font-size: 18px; }
+        #loading { text-align: center; color: #888; margin: 20px 0; }
+        .last-update { text-align: right; font-size: 12px; color: #666; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="station-name">北角 North Point</span>
+            <span class="line-name">港島綫</span>
+        </div>
+        <div id="loading">讀取數據中...</div>
+        <div id="train-data"></div>
+        <div class="last-update" id="last-update-time"></div>
+    </div>
+
+    <script>
+        const apiUrl = 'https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=ISL&sta=NOP';
+
+        async function fetchMTRData() {
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                if (data.status === 1) {
+                    renderData(data.data['ISL-NOP']);
+                } else {
+                    document.getElementById('train-data').innerHTML = '<p>暫時無法獲取數據</p>';
+                }
+            } catch (error) {
+                document.getElementById('train-data').innerHTML = '<p>連線錯誤，請檢查網絡</p>';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                const now = new Date();
+                document.getElementById('last-update-time').innerText = '最後更新: ' + now.toLocaleTimeString();
+            }
+        }
+
+        function renderData(stationData) {
+            const container = document.getElementById('train-data');
+            container.innerHTML = ''; 
+
+            const directions = {
+                'UP': '往 柴灣 (Chai Wan)',
+                'DOWN': '往 堅尼地城 (Kennedy Town)'
+            };
+
+            for (const [dir, label] of Object.entries(directions)) {
+                if (stationData[dir]) {
+                    container.innerHTML += `<div class="direction-title">${label}</div>`;
+                    
+                    // 改咗呢度：顯示最多 4 班車
+                    const trains = stationData[dir].slice(0, 4);
+                    
+                    trains.forEach(train => {
+                        let timeStr = `${train.ttnt} 分鐘`;
+                        let soonClass = "";
+                        
+                        if (train.ttnt === "0" || train.ttnt === "1") {
+                            timeStr = "即將抵達";
+                            soonClass = "soon";
+                        }
+                        
+                        const destMap = { "CHW": "柴灣", "KET": "堅尼地城" };
+                        const destName = destMap[train.dest] || train.dest;
+
+                        container.innerHTML += `
+                            <div class="train-item">
+                                <div>
+                                    <span class="plat">${train.plat} 月台</span>
+                                    <span class="dest-name">${destName}</span>
+                                </div>
+                                <div class="time-left ${soonClass}">${timeStr}</div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        }
+
+        fetchMTRData();
+        setInterval(fetchMTRData, 30000);
+    </script>
+</body>
+</html>
